@@ -64,7 +64,7 @@ export class HeatVisionOverlay {
         void main() {
           float h = texture2D(uHeat, vUv).r;
           if (h < 0.015) discard;
-          gl_FragColor = vec4(ramp(h) * uOpacity, h * uOpacity);
+          gl_FragColor = vec4(ramp(min(1.0, h * 1.5)) * uOpacity, min(1.0, h * 2.5) * uOpacity);
         }
       `,
     });

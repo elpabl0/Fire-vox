@@ -81,5 +81,3 @@ export abstract class UnitBase {
     return false;
   }
 }
-
-export { nextUnitId };
