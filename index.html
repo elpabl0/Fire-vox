@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fire-Vox</title>
+  <style>
+    :root {
+      --hud-bg: rgba(12, 16, 24, 0.82);
+      --hud-border: rgba(255, 255, 255, 0.12);
+      --accent: #ff8c3a;
+      --accent2: #4db8ff;
+      --text: #e8edf4;
+      --muted: #9aa7b8;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; background: #0a0d12;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: var(--text);
+      user-select: none;
+    }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+    #ui { position: fixed; inset: 0; pointer-events: none; }
+    #ui > * { pointer-events: auto; }
+
+    .panel {
+      background: var(--hud-bg);
+      border: 1px solid var(--hud-border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      backdrop-filter: blur(6px);
+    }
+
+    #top-bar {
+      position: absolute; top: 10px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; gap: 18px; align-items: center;
+      font-size: 14px; white-space: nowrap;
+    }
+    #top-bar .stat { display: flex; gap: 6px; align-items: center; }
+    #top-bar .stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+    #top-bar .stat .value { font-weight: 600; font-variant-numeric: tabular-nums; }
+    #cash-value { color: #7fe08a; }
+    #integrity-bar {
+      width: 90px; height: 8px; border-radius: 4px;
+      background: rgba(255,255,255,0.12); overflow: hidden;
+    }
+    #integrity-fill { height: 100%; width: 100%; background: #7fe08a; transition: width 0.4s, background 0.4s; }
+
+    #wind-panel {
+      position: absolute; top: 10px; right: 10px;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      font-size: 11px; color: var(--muted);
+    }
+    #wind-compass { width: 56px; height: 56px; }
+
+    #unit-panel {
+      position: absolute; bottom: 12px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; gap: 8px;
+    }
+    .unit-card {
+      background: var(--hud-bg);
+      border: 1px solid var(--hud-border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      min-width: 92px;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .unit-card.selected { border-color: var(--accent); box-shadow: 0 0 8px rgba(255,140,58,0.4); }
+    .unit-card .name { font-size: 12px; font-weight: 600; }
+    .unit-card .state { font-size: 10px; color: var(--muted); text-transform: lowercase; }
+    .unit-card .water-bar {
+      margin-top: 4px; height: 5px; border-radius: 3px;
+      background: rgba(255,255,255,0.12); overflow: hidden;
+    }
+    .unit-card .water-fill { height: 100%; background: var(--accent2); transition: width 0.2s; }
+
+    #shop-toggle {
+      position: absolute; bottom: 12px; right: 12px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      padding: 10px 16px;
+      border: 1px solid var(--hud-border);
+    }
+    #shop-toggle:hover { border-color: var(--accent); }
+    #shop-panel {
+      position: absolute; bottom: 58px; right: 12px;
+      width: 300px; max-height: 60vh; overflow-y: auto;
+      display: none;
+    }
+    #shop-panel.open { display: block; }
+    #shop-panel h3 { margin: 4px 0 10px; font-size: 14px; }
+    .shop-item {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 8px; padding: 7px 0;
+      border-top: 1px solid rgba(255,255,255,0.07);
+    }
+    .shop-item .info { flex: 1; }
+    .shop-item .iname { font-size: 13px; font-weight: 600; }
+    .shop-item .idesc { font-size: 11px; color: var(--muted); }
+    .shop-item button {
+      background: #1d2a3a; color: var(--text);
+      border: 1px solid var(--hud-border); border-radius: 6px;
+      padding: 5px 10px; font-size: 12px; cursor: pointer;
+      white-space: nowrap; font-variant-numeric: tabular-nums;
+    }
+    .shop-item button:hover:not(:disabled) { border-color: #7fe08a; }
+    .shop-item button:disabled { opacity: 0.4; cursor: default; }
+
+    #toast-area {
+      position: absolute; top: 64px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      pointer-events: none;
+    }
+    .toast {
+      background: var(--hud-bg);
+      border: 1px solid var(--hud-border);
+      border-radius: 6px; padding: 6px 14px;
+      font-size: 13px;
+      animation: toast-in 0.25s ease-out, toast-out 0.5s ease-in 3.2s forwards;
+    }
+    .toast.warn { border-color: var(--accent); color: #ffb37e; }
+    .toast.good { border-color: #7fe08a; color: #a9f0b1; }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } }
+    @keyframes toast-out { to { opacity: 0; } }
+
+    #debug-panel {
+      position: absolute; top: 10px; left: 10px;
+      font: 11px/1.5 monospace; display: none;
+      white-space: pre;
+    }
+    #debug-panel.open { display: block; }
+
+    #screen-overlay {
+      position: absolute; inset: 0;
+      background: rgba(6, 9, 14, 0.88);
+      display: none;
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 14px;
+      text-align: center;
+    }
+    #screen-overlay.open { display: flex; }
+    #screen-overlay h1 { font-size: 42px; margin: 0; letter-spacing: 0.04em; }
+    #screen-overlay h1 .fire { color: var(--accent); }
+    #screen-overlay p { color: var(--muted); max-width: 520px; margin: 0; line-height: 1.6; font-size: 14px; }
+    #screen-overlay .big-btn {
+      background: var(--accent); color: #1a0e04;
+      border: none; border-radius: 8px;
+      font-size: 16px; font-weight: 700;
+      padding: 12px 36px; cursor: pointer;
+      margin-top: 8px;
+    }
+    #screen-overlay .big-btn:hover { filter: brightness(1.1); }
+    #screen-stats { font-size: 15px; color: var(--text); }
+
+    .alert-arrow {
+      position: absolute;
+      width: 0; height: 0;
+      border-left: 9px solid transparent;
+      border-right: 9px solid transparent;
+      border-bottom: 16px solid var(--accent);
+      filter: drop-shadow(0 0 5px rgba(255, 100, 30, 0.9));
+      pointer-events: none;
+      animation: pulse 0.8s infinite alternate;
+    }
+    @keyframes pulse { from { opacity: 0.55; } to { opacity: 1; } }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="ui">
+    <div id="top-bar" class="panel">
+      <div class="stat"><span class="label">Cash</span><span class="value" id="cash-value">$0</span></div>
+      <div class="stat"><span class="label">Score</span><span class="value" id="score-value">0</span></div>
+      <div class="stat"><span class="label">Wave</span><span class="value" id="wave-value">1</span></div>
+      <div class="stat"><span class="label">City</span><div id="integrity-bar"><div id="integrity-fill"></div></div></div>
+    </div>
+    <div id="wind-panel" class="panel">
+      <svg id="wind-compass" viewBox="-32 -32 64 64">
+        <circle r="28" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
+        <text y="-19" text-anchor="middle" fill="#9aa7b8" font-size="9">N</text>
+        <g id="wind-arrow">
+          <path d="M 0 -14 L 6 8 L 0 4 L -6 8 Z" fill="#4db8ff"/>
+        </g>
+      </svg>
+      <span id="wind-strength">calm</span>
+    </div>
+    <div id="unit-panel"></div>
+    <button id="shop-toggle" class="panel">🛒 Upgrades</button>
+    <div id="shop-panel" class="panel">
+      <h3>Fire Department Upgrades</h3>
+      <div id="shop-items"></div>
+    </div>
+    <div id="toast-area"></div>
+    <div id="debug-panel" class="panel"></div>
+    <div id="screen-overlay"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
