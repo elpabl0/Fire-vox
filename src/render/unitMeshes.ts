@@ -10,7 +10,7 @@ function box(w: number, h: number, d: number, color: number): THREE.Mesh {
   return m;
 }
 
-function buildEngineMesh(accent: number): THREE.Group {
+function buildEngineMesh(accent: number): { group: THREE.Group; turret: THREE.Group } {
   const g = new THREE.Group();
   const chassis = box(2.6, 0.9, 1.2, 0xc0392b);
   chassis.position.y = 0.75;
@@ -30,7 +30,15 @@ function buildEngineMesh(accent: number): THREE.Group {
       g.add(wheel);
     }
   }
-  return g;
+  // roof monitor (deck gun) — swivels independently of the chassis
+  const turret = new THREE.Group();
+  const mount = box(0.3, 0.22, 0.3, 0x6a7480);
+  const barrel = box(0.7, 0.12, 0.12, 0x95a5a6);
+  barrel.position.set(0.4, 0.16, 0);
+  turret.add(mount, barrel);
+  turret.position.set(0.25, 1.96, 0);
+  g.add(turret);
+  return { group: g, turret };
 }
 
 function buildHelicopterMesh(accent: number): { group: THREE.Group; rotor: THREE.Mesh } {
@@ -85,6 +93,7 @@ interface TrackedUnit {
   unit: UnitBase;
   group: THREE.Group;
   rotor: THREE.Mesh | null;
+  turret: THREE.Group | null;
 }
 
 /** Syncs voxel-styled procedural unit models with sim unit positions; shows a selection ring. */
@@ -113,17 +122,17 @@ export class UnitMeshes {
     for (const unit of this.manager.allUnits) {
       if (!this.tracked.some((t) => t.unit === unit)) {
         if (unit.kind === 'engine') {
-          const group = buildEngineMesh(unit.accentColor);
+          const { group, turret } = buildEngineMesh(unit.accentColor);
           this.scene.add(group);
-          this.tracked.push({ unit, group, rotor: null });
+          this.tracked.push({ unit, group, rotor: null, turret });
         } else if (unit.kind === 'helicopter') {
           const { group, rotor } = buildHelicopterMesh(unit.accentColor);
           this.scene.add(group);
-          this.tracked.push({ unit, group, rotor });
+          this.tracked.push({ unit, group, rotor, turret: null });
         } else {
           const group = buildFirefighterMesh();
           this.scene.add(group);
-          this.tracked.push({ unit, group, rotor: null });
+          this.tracked.push({ unit, group, rotor: null, turret: null });
         }
       }
     }
@@ -134,6 +143,8 @@ export class UnitMeshes {
       }
       t.group.position.set(t.unit.x, t.unit.y, t.unit.z);
       t.group.rotation.y = -t.unit.heading;
+      // monitor turret tracks its target in world space, independent of the chassis
+      if (t.turret) t.turret.rotation.y = t.unit.heading - t.unit.turretAngle;
       if (t.rotor) {
         const speed = t.unit instanceof Helicopter ? t.unit.rotorSpeed : 1;
         this.rotorAngle += dt * 18 * speed;

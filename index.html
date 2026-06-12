@@ -94,6 +94,8 @@
       transition: border-color 0.15s, box-shadow 0.15s;
     }
     .unit-card.selected { border-color: var(--accent); box-shadow: 0 0 8px rgba(255,140,58,0.4); }
+    .unit-card.all { display: flex; align-items: center; justify-content: center; min-width: 56px; font-weight: 700; }
+    .unit-card.all .name { color: var(--accent2); }
     .unit-card .name { font-size: 12px; font-weight: 600; }
     .unit-card .state { font-size: 10px; color: var(--muted); text-transform: lowercase; }
     .unit-card .water-bar {
@@ -109,6 +111,39 @@
       border: 1px solid var(--hud-border);
     }
     #shop-toggle:hover { border-color: var(--accent); }
+
+    #budget-toggle {
+      position: absolute; bottom: 60px; right: 12px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      padding: 9px 12px;
+      border: 1px solid var(--hud-border);
+      font-variant-numeric: tabular-nums;
+    }
+    #budget-toggle:hover { border-color: #7fe08a; }
+    #budget-panel {
+      position: absolute; bottom: 104px; right: 12px;
+      width: 320px; max-height: 64vh; overflow-y: auto;
+      display: none;
+    }
+    #budget-panel.open { display: block; }
+    #budget-panel h3 { margin: 4px 0 8px; font-size: 14px; }
+    #budget-panel h4 { margin: 10px 0 6px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .b-row { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; }
+    .b-row.b-head { color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.06em; margin-top: 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .b-row.b-net { border-top: 1px solid rgba(255,255,255,0.12); margin-top: 2px; }
+    .b-row .pos { color: #7fe08a; }
+    .b-row .neg { color: #f0a0a0; }
+    .budget-options { display: flex; gap: 5px; flex-wrap: wrap; }
+    .budget-opt {
+      flex: 1 1 45%;
+      background: #1d2a3a; color: var(--text);
+      border: 1px solid var(--hud-border); border-radius: 6px;
+      padding: 6px 8px; font-size: 11px; cursor: pointer;
+      text-align: left;
+    }
+    .budget-opt b { display: block; font-size: 12px; }
+    .budget-opt span { color: var(--muted); font-size: 10px; }
+    .budget-opt.active { border-color: var(--accent); box-shadow: 0 0 6px rgba(255,140,58,0.35); }
     #shop-panel {
       position: absolute; bottom: 58px; right: 12px;
       width: 300px; max-height: 60vh; overflow-y: auto;
@@ -256,6 +291,18 @@
         right: max(8px, env(safe-area-inset-right));
         bottom: 64px; width: auto; max-height: 46vh;
       }
+      #budget-toggle {
+        bottom: max(58px, calc(env(safe-area-inset-bottom) + 50px));
+        right: max(8px, env(safe-area-inset-right));
+        font-size: 11px; padding: 10px 10px;
+      }
+      #budget-panel {
+        left: max(8px, env(safe-area-inset-left));
+        right: max(8px, env(safe-area-inset-right));
+        bottom: 104px; width: auto; max-height: 46vh;
+      }
+      /* span the gap between the toolbar (left) and budget/shop buttons (right) */
+      #unit-panel { left: 100px; right: 90px; transform: none; max-width: none; justify-content: flex-start; }
       .shop-item button { padding: 9px 12px; }
       #toast-area { top: 52px; width: 92vw; }
       .toast { font-size: 12px; }
@@ -303,6 +350,15 @@
     </div>
     <div id="unit-panel"></div>
     <button id="shop-toggle" class="panel">🛒 Upgrades</button>
+    <button id="budget-toggle" class="panel">📋 Month 1</button>
+    <div id="budget-panel" class="panel">
+      <h3>Monthly Strategy</h3>
+      <div id="budget-report"></div>
+      <h4>Tax rate</h4>
+      <div class="budget-options" id="budget-tax"></div>
+      <h4>Funding focus</h4>
+      <div class="budget-options" id="budget-focus"></div>
+    </div>
     <div id="shop-panel" class="panel">
       <h3>Fire Department Upgrades</h3>
       <div id="shop-items"></div>

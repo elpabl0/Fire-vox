@@ -16,6 +16,8 @@ export class Helicopter extends UnitBase {
   /** Rotor speed factor for the renderer (spins down when landed). */
   rotorSpeed = 0;
   cruiseY = UNITS.HELICOPTER.altitude;
+  /** Assigned helipad on the HQ roof (falls back to the station door). */
+  pad: { x: number; z: number; y: number } | null = null;
   private targetY = 1.2;
 
   constructor(stats: UnitStats) {
@@ -39,7 +41,7 @@ export class Helicopter extends UnitBase {
   update(dt: number, ctx: UnitContext): void {
     const cluster = ctx.clusters.byId(this.assignedCluster);
     const airborne = this._state !== 'landed';
-    this.targetY = airborne ? this.cruiseY : 1.2;
+    this.targetY = airborne ? this.cruiseY : this.pad ? this.pad.y + 0.35 : 1.2;
     this.y += (this.targetY - this.y) * Math.min(1, dt * 1.6);
     const rotorTarget = airborne ? 1 : 0;
     this.rotorSpeed += (rotorTarget - this.rotorSpeed) * Math.min(1, dt * 0.8);
@@ -57,7 +59,7 @@ export class Helicopter extends UnitBase {
           this._state = this.water > 0 ? 'toFire' : 'toWater';
           break;
         }
-        if (this.moveToward(ctx.stationDoor.x, ctx.stationDoor.z, dt)) {
+        if (this.moveToward(this.pad ? this.pad.x : ctx.stationDoor.x, this.pad ? this.pad.z : ctx.stationDoor.z, dt)) {
           this._state = 'landed';
           this.orderedTarget = null;
         }

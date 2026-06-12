@@ -36,6 +36,8 @@ export interface UnitContext {
   releaseTarget(unit: UnitBase): void;
   /** True when a civilian vehicle blocks the road just ahead of this unit. */
   obstacleAhead(unit: UnitBase): boolean;
+  /** Monthly-policy multipliers (training/maintenance funding focus). */
+  policy: { hosePowerMul: number; speedMul: number };
 }
 
 let nextUnitId = 1;
@@ -48,6 +50,8 @@ export abstract class UnitBase {
   z = 0;
   y = 1;
   heading = 0;
+  /** Hose/monitor aim, independent of the chassis heading. */
+  turretAngle = 0;
   water: number;
   stats: UnitStats;
   assignedCluster = -1;

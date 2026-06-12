@@ -7,6 +7,8 @@ export interface UpgradeContext {
   unlockHeatVision(): void;
   /** Adds one placeable hydrant to the player's inventory. */
   grantHydrant(): void;
+  /** Alarm-network level: shortens the fire report delay. */
+  setDetectionLevel(level: number): void;
 }
 
 export interface UpgradeDef {
@@ -56,6 +58,15 @@ export const UPGRADES: UpgradeDef[] = [
     costMult: 1.7,
     maxLevel: 2,
     apply: (ctx, level) => ctx.units.setCrewLevel(level),
+  },
+  {
+    id: 'detection',
+    name: 'Alarm Network',
+    desc: 'Smoke detectors citywide — fires get called in sooner',
+    baseCost: 120,
+    costMult: 1.7,
+    maxLevel: 3,
+    apply: (ctx, level) => ctx.setDetectionLevel(level),
   },
   {
     id: 'hydrant',

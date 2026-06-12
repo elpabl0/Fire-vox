@@ -97,8 +97,9 @@ export class Firefighter extends UnitBase {
     // in range: spray from the engine's tank
     this._state = 'spraying';
     this.heading = Math.atan2(tz - this.z, tx - this.x);
+    this.turretAngle = this.heading;
     this.spraying = true;
-    const amount = Math.min(this.stats.hosePower * dt, e.water);
+    const amount = Math.min(this.stats.hosePower * ctx.policy.hosePowerMul * dt, e.water);
     if (amount <= 0) {
       this.spraying = false;
       return;

@@ -1,7 +1,8 @@
 import * as THREE from 'three';
+import { DetectionSystem } from '../sim/detection';
 import { FireClusterizer } from '../sim/fireClusters';
 
-/** Edge-of-screen arrows pointing at off-screen fire clusters. */
+/** Edge-of-screen arrows pointing at off-screen *reported* fire clusters. */
 export class FireAlerts {
   private root = document.getElementById('ui')!;
   private arrows: HTMLElement[] = [];
@@ -9,12 +10,14 @@ export class FireAlerts {
 
   constructor(
     private clusters: FireClusterizer,
+    private detection: DetectionSystem,
     private camera: THREE.PerspectiveCamera,
   ) {}
 
   update(): void {
     let used = 0;
     for (const cluster of this.clusters.clusters) {
+      if (!this.detection.isReported(cluster.id)) continue; // unnoticed fires stay off the radar
       this.vec.set(cluster.cx, 4, cluster.cz);
       this.vec.project(this.camera);
       const onScreen = this.vec.x > -1 && this.vec.x < 1 && this.vec.y > -1 && this.vec.y < 1 && this.vec.z < 1;

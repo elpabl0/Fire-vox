@@ -106,7 +106,14 @@ export class Engine extends UnitBase {
         this.coast(dt);
         this.water = Math.min(this.stats.waterMax, this.water + this.stats.refillRate * dt);
         if (this.water >= this.stats.waterMax) {
-          this._state = 'idle';
+          // tank full: resume the job if our fire still burns, don't just stand down
+          const cluster = ctx.clusters.byId(this.assignedCluster);
+          if (cluster && cluster.size > 0) {
+            this.driveTo(cluster.cx, cluster.cz, ctx, 'fire');
+          } else {
+            this.assignedCluster = -1;
+            this._state = 'idle';
+          }
         }
         break;
     }
@@ -150,7 +157,7 @@ export class Engine extends UnitBase {
     const E = UNITS.ENGINE;
 
     // corner ahead: angle change at the next vertex and the distance to it
-    let targetSpeed = this.stats.speed;
+    let targetSpeed = this.stats.speed * ctx.policy.speedMul;
     const seg = this.segmentAt(this.s);
     if (seg.index + 1 < this.path.length - 1) {
       const distToCorner = this.cumLen[seg.index + 1] - this.s;
@@ -189,6 +196,7 @@ export class Engine extends UnitBase {
     const gripRate = E.grip / (1 + Math.max(0, this.speedCur - 5.5) * 0.55);
     this.travelAngle = tangent;
     this.heading = lerpAngle(this.heading, tangent, Math.min(1, gripRate * dt));
+    this.turretAngle = this.heading; // monitor stows forward while driving
     this.drifting = Math.abs(angleDelta(this.heading, tangent)) > 0.18 && this.speedCur > 4.2;
   }
 
@@ -271,13 +279,14 @@ export class Engine extends UnitBase {
         return;
       }
     }
-    // spray the claimed voxel (with slight scatter so the splash wets neighbours)
+    // spray the claimed voxel: the chassis stays put, only the monitor turret tracks it
     const tx = Math.floor(this.targetVoxel / (D * H));
     const tz = Math.floor(this.targetVoxel / H) % D;
     const ty = this.targetVoxel % H;
-    this.heading = Math.atan2(tz - this.z, tx - this.x);
+    const aim = Math.atan2(tz - this.z, tx - this.x);
+    this.turretAngle = lerpAngle(this.turretAngle, aim, Math.min(1, dt * 6));
     this.spraying = true;
-    const amount = this.stats.hosePower * dt;
+    const amount = this.stats.hosePower * ctx.policy.hosePowerMul * dt;
     ctx.water.hitAt(tx + ctx.rng.range(-0.6, 0.6), ty, tz + ctx.rng.range(-0.6, 0.6), amount);
     this.water -= amount;
   }

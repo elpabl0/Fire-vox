@@ -112,8 +112,8 @@ export const UNITS = {
 } as const;
 
 export const CIVILIANS = {
-  CARS: 28,
-  PEDESTRIANS: 90,
+  CARS: 64,
+  PEDESTRIANS: 240,
   CAR_SPEED: 4.5,
   CAR_ACCEL: 3,
   PED_SPEED: 1.3,
@@ -125,6 +125,44 @@ export const CIVILIANS = {
   GAWK_CHANCE: 0.3,
   /** Cars pull over when an active engine is within this range. */
   PULLOVER_RADIUS: 9,
+  /** Cars queue this far behind the vehicle in front. */
+  FOLLOW_GAP: 2.0,
+  /** A car blocked this long turns around to clear gridlock. */
+  BLOCKED_TURNAROUND_S: 12,
+} as const;
+
+export const DETECTION = {
+  /** Base seconds before an unnoticed fire is called in (shrinks as it grows). */
+  BASE_DELAY_S: 40,
+  MIN_DELAY_S: 6,
+  /** Delay shrinks by this many seconds per burning voxel. */
+  PER_VOXEL_S: 0.4,
+  /** Witnesses nearby call it in much faster. */
+  WITNESS_RADIUS: 18,
+  WITNESS_MUL: 0.45,
+} as const;
+
+export const BUDGET = {
+  /** Real seconds per in-game month. */
+  MONTH_S: 90,
+  /** Tax income per building lot-value point per month (normal rate). */
+  TAX_PER_LOT_VALUE: 1.2,
+  ENGINE_UPKEEP: 18,
+  HELI_UPKEEP: 45,
+  CREW_SALARY: 8,
+  HYDRANT_UPKEEP: 3,
+  EQUIPMENT_UPKEEP_PER_LEVEL: 2.5,
+  /** Integrity slowly recovers each month (modified by policy). */
+  INTEGRITY_REGEN: 1,
+  TAX_RATES: { low: 0.7, normal: 1.0, high: 1.35 },
+  /** Integrity drift per month by tax rate (citizens' goodwill). */
+  TAX_INTEGRITY: { low: 1, normal: 0, high: -1.5 },
+  /** Funding focus effects. */
+  FOCUS_POWER_MUL: 1.12, // training
+  FOCUS_SPEED_MUL: 1.12, // maintenance
+  FOCUS_DETECTION_MUL: 0.7, // community
+  FOCUS_INTEGRITY_BONUS: 2, // community
+  FOCUS_EXPENSE_MUL: 0.85, // savings
 } as const;
 
 export const WAVES = {

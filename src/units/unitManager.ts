@@ -24,6 +24,12 @@ export class UnitManager {
   readonly hydrants: Hydrant[] = [];
   readonly coordinator: Coordinator;
   selected: UnitBase | null = null;
+  /** "All units" order mode: the next map order goes to every unit. */
+  selectAll = false;
+  /** Helipads on the HQ roof; one assigned per helicopter. */
+  helipads: Array<{ x: number; z: number; y: number }> = [];
+  /** Monthly-policy multipliers, set by the budget. */
+  readonly policy = { hosePowerMul: 1, speedMul: 1 };
   /** Cross-map auto-dispatch (off: finding fires and dispatching is the player's role). */
   autoAssign = false;
   /** Upgrade-modified stats applied to newly spawned and existing engines. */
@@ -63,6 +69,7 @@ export class UnitManager {
       requestEngagement: (unit) => coordinator.requestEngagement(unit),
       releaseTarget: (unit) => coordinator.releaseTarget(unit),
       obstacleAhead: (unit) => this.obstacleCheck(unit),
+      policy: this.policy,
     };
   }
 
@@ -96,8 +103,17 @@ export class UnitManager {
       refillRate: UNITS.HELICOPTER.fillRate,
     });
     heli.accentColor = ACCENT_PALETTE[this.spawnCount++ % ACCENT_PALETTE.length];
-    heli.x = this.ctx.stationDoor.x;
-    heli.z = this.ctx.stationDoor.z;
+    const heliCount = this.units.filter((u) => u.kind === 'helicopter').length;
+    const pad = this.helipads[heliCount % Math.max(1, this.helipads.length)];
+    if (pad) {
+      heli.pad = pad;
+      heli.x = pad.x;
+      heli.z = pad.z;
+      heli.y = pad.y + 0.35;
+    } else {
+      heli.x = this.ctx.stationDoor.x;
+      heli.z = this.ctx.stationDoor.z;
+    }
     this.units.push(heli);
     return heli;
   }
@@ -148,10 +164,49 @@ export class UnitManager {
       this.coordinator.replan(this.allUnits, this.fire.activeFire, this.ctx, this.autoAssign);
     }
     for (const unit of this.units) unit.update(dt, this.ctx);
+    this.separateEngines();
   }
 
-  /** Player order: send the selected unit (or nearest idle engine) to a map point. */
+  /** Stationary engines must not occupy the same space (refill queues, shared fronts). */
+  private separateEngines(): void {
+    const engines = this.units.filter((u) => u.kind === 'engine');
+    for (let i = 0; i < engines.length; i++) {
+      for (let j = i + 1; j < engines.length; j++) {
+        const a = engines[i];
+        const b = engines[j];
+        const dx = b.x - a.x;
+        const dz = b.z - a.z;
+        const d = Math.hypot(dx, dz);
+        if (d >= 2.2 || d < 1e-4) {
+          if (d < 1e-4) {
+            // perfectly stacked: nudge apart deterministically
+            b.x += 0.6;
+            b.z += 0.3;
+          }
+          continue;
+        }
+        const push = (2.2 - d) / 2;
+        const nx = dx / d;
+        const nz = dz / d;
+        a.x -= nx * push;
+        a.z -= nz * push;
+        b.x += nx * push;
+        b.z += nz * push;
+      }
+    }
+  }
+
+  /** Player order: send the selected unit / all units / nearest idle to a map point. */
   orderAt(x: number, z: number): boolean {
+    if (this.selectAll) {
+      this.selectAll = false; // one-shot: issue and revert to normal selection
+      let any = false;
+      for (const u of this.units) {
+        u.orderTo(x, z, this.ctx);
+        any = true;
+      }
+      return any;
+    }
     const unit = this.selected ?? this.nearestIdle(x, z);
     if (!unit) return false;
     unit.orderTo(x, z, this.ctx);

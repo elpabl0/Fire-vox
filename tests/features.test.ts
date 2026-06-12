@@ -146,6 +146,7 @@ describe('helicopter', () => {
       requestEngagement: () => null,
       releaseTarget: () => undefined,
       obstacleAhead: () => false,
+      policy: { hosePowerMul: 1, speedMul: 1 },
     };
     const heli = new Helicopter({
       speed: UNITS.HELICOPTER.speed,

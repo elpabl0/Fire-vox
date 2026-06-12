@@ -12,6 +12,7 @@ export class Hud {
   private unitPanel = document.getElementById('unit-panel')!;
   private toastArea = document.getElementById('toast-area')!;
   private cards = new Map<UnitBase, { root: HTMLElement; state: HTMLElement; fill: HTMLElement }>();
+  private allCard: HTMLElement;
 
   constructor(
     private economy: Economy,
@@ -20,6 +21,15 @@ export class Hud {
     events: EventBus,
   ) {
     events.on('toast', ({ text, kind }) => this.toast(text, kind));
+    // "ALL" card: next map tap orders every unit (one-shot)
+    this.allCard = document.createElement('div');
+    this.allCard.className = 'unit-card all';
+    this.allCard.innerHTML = '<div class="name">ALL</div>';
+    this.allCard.addEventListener('click', () => {
+      this.units.selectAll = !this.units.selectAll;
+      if (this.units.selectAll) this.units.selected = null;
+    });
+    this.unitPanel.appendChild(this.allCard);
   }
 
   toast(text: string, kind: 'info' | 'warn' | 'good'): void {
@@ -56,6 +66,7 @@ export class Hud {
         bar.appendChild(fill);
         root.append(name, state, bar);
         root.addEventListener('click', () => {
+          this.units.selectAll = false;
           this.units.selected = this.units.selected === unit ? null : unit;
         });
         this.unitPanel.appendChild(root);
@@ -66,5 +77,6 @@ export class Hud {
       card.state.textContent = unit.state;
       card.fill.style.width = `${unit.waterFraction * 100}%`;
     }
+    this.allCard.classList.toggle('selected', this.units.selectAll);
   }
 }

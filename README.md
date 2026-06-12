@@ -11,7 +11,7 @@ npm install
 npm run dev      # then open the printed URL
 ```
 
-**You are the dispatcher** — engines never self-deploy across the city. Watch for outbreak alerts, click a unit (or its card), then click the fire. A coloured beacon marks each unit's ordered destination, and units can be re-deployed at any time the same way. Units close to a blaze will pitch in on their own.
+**You are the dispatcher** — engines never self-deploy across the city, and fires burn *unnoticed* until somebody calls them in, so patrol the map and watch for smoke. Click a unit (or its card), then click the fire; the **ALL** card sends every unit at once. A coloured beacon marks each unit's ordered destination, and units can be re-deployed at any time. Units close to a blaze pitch in on their own, and engines that run dry refill at the nearest water point and return to the job.
 
 - **Left-click a fire** — dispatch the selected (or nearest idle) unit; a beacon tracks the order
 - **Click a unit / unit card** — select it; **Esc** deselects
@@ -21,7 +21,7 @@ npm run dev      # then open the printed URL
 - **H** — heat vision (once purchased) · **Space** — pause · **`** — debug panel
 - `?seed=N` in the URL replays the same city
 
-Survive escalating waves of outbreaks. Cash earned from extinguishing fires and saving buildings buys upgrades: more engines, firefighter crews that run hand lines on foot, a water-bombing helicopter (lands back at HQ between calls), heat vision, hydrants, and better hoses/tanks/pumps. Lose too many buildings and the city falls.
+Survive escalating waves of outbreaks while running the department's books: every month you collect **tax** from the surviving city and pay **vehicle maintenance, crew salaries and equipment upkeep** — open the 📋 monthly strategy panel to set the tax rate (income vs civic goodwill) and a funding focus (training, maintenance, community programmes or savings). Cash buys upgrades: more engines, firefighter crews, water-bombing helicopters (each lands on its own HQ helipad), heat vision, an alarm network for faster fire reports, hydrants, and better hoses/tanks/pumps. Lose too many buildings — or run the budget into the ground — and the city falls.
 
 *Psst — click the wind compass three times quickly.*
 
@@ -32,7 +32,8 @@ Survive escalating waves of outbreaks. Cash earned from extinguishing fires and 
 - **Weather** — random clear/rain/storm/snow with a day-night cycle, sun shadows and moonlight. Rain douses exposed fire and suppresses spread (roads take on a wet sheen afterwards); storms force gale-strength wind — prime ember weather; snow settles white on rooftops.
 - **Water** — hose streams are ballistic arcs; impacts cool and wet voxels (wet fuel resists ignition — spray ahead of the front to cut firebreaks). Helicopters refill at the pond and drop on the hottest core.
 - **Unit AI** — burning voxels are clustered ~1×/s; a coordinator hands each unit a *distinct, spaced* perimeter target with a road standing spot, so units fighting the same blaze fan out along its edge. Firefighter crews hop off and run tethered hand lines fed by the engine's tank.
-- **Driving** — engines accelerate, brake into corners and drift when pushed, leaving tyre marks. Civilian cars cruise the roads (pulling over for sirens) and pedestrians wander the sidewalks — both flee approaching fire, though some stop to gawk from a safe distance.
+- **Driving & traffic** — engines accelerate, brake into corners and drift when pushed, leaving tyre marks; their roof monitor swivels at the fire independently of the chassis. Dozens of civilian cars queue behind each other with real following distances (jams form behind anything blocking a lane — including your parked engines), pull over for sirens, and turn around when gridlocked; hundreds of pedestrians wander, flee fires or stop to gawk. Engines brake for traffic and never occupy the same space as each other.
+- **Detection** — fires get called in faster when they're big or witnessed; the alarm-network upgrade and community funding shorten the delay. Until a fire is reported, no alert arrows appear.
 - **Rendering** — chunked per-face-culled voxel meshes with budgeted dirty-chunk rebuilds; GPU-animated smoke/flame/ember/rain/snow particles; damage, charring and wet states baked into vertex colours; heat vision projects a per-column thermal map directly onto the voxels.
 - **Determinism** — the sim is pure TypeScript with no Three.js imports, fully seeded (`Math.random` is banned outside `src/core/rng.ts`), and unit-tested headless.
 

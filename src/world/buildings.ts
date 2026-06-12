@@ -202,9 +202,11 @@ export function stampIndustrial(grid: VoxelGrid, rng: Rng, b: Building): void {
 
 /**
  * Fire HQ: red-brick two-storey hall with white trim band and roof, garage
- * bays facing the road, and a corner watchtower. `facing`: 0 +x, 1 -x, 2 +z, 3 -z.
+ * bays facing the road, a corner watchtower, and rooftop helipads (one per
+ * purchasable helicopter). `facing`: 0 +x, 1 -x, 2 +z, 3 -z.
+ * Returns the helipad landing points.
  */
-export function stampStation(grid: VoxelGrid, b: Building, facing: number): void {
+export function stampStation(grid: VoxelGrid, b: Building, facing: number): Array<{ x: number; z: number; y: number }> {
   const { x0, z0, x1, z1 } = b;
   const height = 4;
   for (let y = 1; y <= height; y++) {
@@ -231,14 +233,38 @@ export function stampStation(grid: VoxelGrid, b: Building, facing: number): void
       }
     }
   }
-  // white flat roof with a red cross
-  const cx = Math.floor((x0 + x1) / 2);
-  const cz = Math.floor((z0 + z1) / 2);
+  // white flat roof
   for (let x = x0; x <= x1; x++) {
     for (let z = z0; z <= z1; z++) {
-      const cross = (x === cx && Math.abs(z - cz) <= 2) || (z === cz && Math.abs(x - cx) <= 2);
-      put(grid, b, x, height + 1, z, cross ? Mat.STATION : Mat.STATION_TRIM);
+      put(grid, b, x, height + 1, z, Mat.STATION_TRIM);
     }
+  }
+  // two rooftop helipads: dark 3x3 squares with a white "H"
+  const pads: Array<{ x: number; z: number; y: number }> = [];
+  const roofY = height + 1;
+  const longAxisZ = z1 - z0 >= x1 - x0;
+  const midX = Math.floor((x0 + x1) / 2);
+  const midZ = Math.floor((z0 + z1) / 2);
+  const padCentres = longAxisZ
+    ? [
+        { x: midX, z: z0 + 2 },
+        { x: midX, z: z1 - 2 },
+      ]
+    : [
+        { x: x0 + 2, z: midZ },
+        { x: x1 - 2, z: midZ },
+      ];
+  for (const c of padCentres) {
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const px = c.x + dx;
+        const pz = c.z + dz;
+        if (px < x0 || px > x1 || pz < z0 || pz > z1) continue;
+        const isH = Math.abs(dx) === 1 || dz === 0;
+        put(grid, b, px, roofY, pz, isH ? Mat.STATION_TRIM : Mat.STATION_DOOR);
+      }
+    }
+    pads.push({ x: c.x, z: c.z, y: roofY + 1 });
   }
   // corner watchtower with glazed top
   const twX = facing === 1 ? x1 - 1 : x0;
@@ -251,6 +277,7 @@ export function stampStation(grid: VoxelGrid, b: Building, facing: number): void
       }
     }
   }
+  return pads;
 }
 
 /** Tree: trunk column + leaf blob. Owned by the park lot (id may be 0). */

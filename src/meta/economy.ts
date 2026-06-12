@@ -39,12 +39,8 @@ export class Economy {
         this.events.emit('toast', { text: `${kindLabel(b)} saved! +$${bonus}`, kind: 'good' });
       } else if (outcome === 'lost') {
         this.buildingsLost++;
-        this.integrity = Math.max(0, this.integrity - ECONOMY.INTEGRITY_LOSS * Math.max(1, b.lotValue));
         this.events.emit('toast', { text: `${kindLabel(b)} lost!`, kind: 'warn' });
-        if (this.integrity <= 0 && !this.over) {
-          this.over = true;
-          this.events.emit('gameOver', { score: this.score, wave: this.waveRef.wave });
-        }
+        this.adjustIntegrity(-ECONOMY.INTEGRITY_LOSS * Math.max(1, b.lotValue));
       }
     });
     events.on('waveCleared', ({ wave, bonus }) => {
@@ -55,6 +51,15 @@ export class Economy {
 
   get isGameOver(): boolean {
     return this.over;
+  }
+
+  /** Clamped integrity change; hitting zero ends the run. */
+  adjustIntegrity(delta: number): void {
+    this.integrity = Math.max(0, Math.min(100, this.integrity + delta));
+    if (this.integrity <= 0 && !this.over) {
+      this.over = true;
+      this.events.emit('gameOver', { score: this.score, wave: this.waveRef.wave });
+    }
   }
 
   earn(amount: number): void {

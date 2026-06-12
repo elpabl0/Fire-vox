@@ -26,6 +26,8 @@ export interface CivilianCar {
   /** Progress to the next cell decision point. */
   cellX: number;
   cellZ: number;
+  /** Seconds spent (almost) stationary while wanting to move — gridlock escape. */
+  blockedFor: number;
 }
 
 export interface Pedestrian {
@@ -77,6 +79,7 @@ export class CivilianManager {
         color: rng.pick(CAR_COLORS),
         cellX: x,
         cellZ: z,
+        blockedFor: 0,
       });
     }
     // spawn pedestrians on walkable cells
@@ -137,9 +140,29 @@ export class CivilianManager {
       car.state = 'drive';
     }
 
-    const targetSpeed = car.state === 'pullover' ? 0 : car.state === 'flee' ? CIVILIANS.CAR_SPEED * 1.6 : CIVILIANS.CAR_SPEED;
+    let targetSpeed = car.state === 'pullover' ? 0 : car.state === 'flee' ? CIVILIANS.CAR_SPEED * 1.6 : CIVILIANS.CAR_SPEED;
+
+    // collision avoidance: queue behind any vehicle/engine occupying the road ahead.
+    // Stopped leaders propagate stops backwards — that's where traffic jams come from.
+    const blocker = this.vehicleAhead(car, engines);
+    if (blocker !== null) {
+      targetSpeed = Math.min(targetSpeed, blocker);
+    }
+
     if (car.speed < targetSpeed) car.speed = Math.min(targetSpeed, car.speed + CIVILIANS.CAR_ACCEL * dt);
-    else car.speed = Math.max(targetSpeed, car.speed - CIVILIANS.CAR_ACCEL * 2 * dt);
+    else car.speed = Math.max(targetSpeed, car.speed - CIVILIANS.CAR_ACCEL * 3 * dt);
+
+    // gridlock escape: blocked too long -> turn around
+    if (car.state !== 'pullover' && targetSpeed < 0.3 && blocker !== null) {
+      car.blockedFor += dt;
+      if (car.blockedFor > CIVILIANS.BLOCKED_TURNAROUND_S) {
+        car.blockedFor = 0;
+        car.dirX = -car.dirX;
+        car.dirZ = -car.dirZ;
+      }
+    } else if (car.speed > 0.5) {
+      car.blockedFor = 0;
+    }
     if (car.speed < 0.05) return;
 
     // advance along the current direction; decide at cell centres
@@ -179,6 +202,34 @@ export class CivilianManager {
         car.dirZ = dir[1];
       }
     }
+  }
+
+  /**
+   * Speed limit imposed by traffic ahead of this car, or null if the lane is
+   * clear. Cars match a moving leader's speed and stop short of a stationary
+   * one (including fire engines blocking the road).
+   */
+  private vehicleAhead(car: CivilianCar, engines: UnitBase[]): number | null {
+    let limit: number | null = null;
+    const consider = (ox: number, oz: number, oSpeed: number) => {
+      const dx = ox - car.x;
+      const dz = oz - car.z;
+      const ahead = dx * car.dirX + dz * car.dirZ;
+      if (ahead < 0.3 || ahead > CIVILIANS.FOLLOW_GAP + 1.5) return;
+      const lateral = Math.abs(dx * -car.dirZ + dz * car.dirX);
+      if (lateral > 0.9) return;
+      const v = ahead < CIVILIANS.FOLLOW_GAP ? 0 : Math.max(0, oSpeed * 0.9);
+      limit = limit === null ? v : Math.min(limit, v);
+    };
+    for (const other of this.cars) {
+      if (other === car) continue;
+      consider(other.x, other.z, other.speed);
+    }
+    for (const e of engines) {
+      if (e.kind !== 'engine') continue;
+      consider(e.x, e.z, 0);
+    }
+    return limit;
   }
 
   private isRoad(x: number, z: number): boolean {

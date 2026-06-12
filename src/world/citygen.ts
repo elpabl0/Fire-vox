@@ -16,6 +16,8 @@ export interface City {
   stationDoor: { x: number; z: number };
   /** Centre of the pond (helicopter refill). */
   pond: { x: number; z: number };
+  /** Helipad landing points on the HQ roof. */
+  helipads: Array<{ x: number; z: number; y: number }>;
 }
 
 type BlockKind = 'houses' | 'offices' | 'towers' | 'industrial' | 'park' | 'pond';
@@ -124,7 +126,7 @@ export function generateCity(seed: number): City {
   }
 
   // 5. Fire station: replace a building near the centre with the station.
-  const stationDoor = placeStation(grid, rng, roads, buildings, blocks);
+  const { stationDoor, helipads } = placeStation(grid, rng, roads, buildings, blocks);
 
   // 6. Parked cars on sidewalk rings near houses.
   for (const block of blocks) {
@@ -141,7 +143,7 @@ export function generateCity(seed: number): City {
 
   grid.snapshotOriginal();
   grid.markAllDirty();
-  return { grid, roads, buildings, stationDoor, pond };
+  return { grid, roads, buildings, stationDoor, pond, helipads };
 }
 
 function spansBetween(lines: number[], extent: number): Array<[number, number]> {
@@ -263,7 +265,7 @@ function placeStation(
   roads: RoadNetwork,
   buildings: Building[],
   blocks: Block[],
-): { x: number; z: number } {
+): { stationDoor: { x: number; z: number }; helipads: Array<{ x: number; z: number; y: number }> } {
   // Pick the house/office building closest to the map centre and rebuild it as the station.
   const cx = W / 2;
   const cz = D / 2;
@@ -316,7 +318,7 @@ function placeStation(
   ];
   let facing = 0;
   for (let i = 1; i < 4; i++) if (dists[i] < dists[facing]) facing = i;
-  stampStation(grid, best, facing);
+  const helipads = stampStation(grid, best, facing);
   void rng;
   // door: road cell outside the facing wall
   const doorPoint =
@@ -328,5 +330,5 @@ function placeStation(
           ? { x: midX, z: best.z1 + 2 }
           : { x: midX, z: best.z0 - 2 };
   const mid = roads.nearestRoadCell(doorPoint.x, doorPoint.z);
-  return mid ?? { x: best.x0, z: best.z0 };
+  return { stationDoor: mid ?? { x: best.x0, z: best.z0 }, helipads };
 }

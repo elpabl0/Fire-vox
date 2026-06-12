@@ -9,10 +9,12 @@ import { WaterSim } from './sim/waterSim';
 import { FireClusterizer } from './sim/fireClusters';
 import { WaveDirector } from './sim/outbreaks';
 import { CivilianManager } from './sim/civilians';
+import { DetectionSystem } from './sim/detection';
 import { UnitManager } from './units/unitManager';
 import { Engine } from './units/engine';
 import { UnitBase } from './units/unit';
 import { Economy } from './meta/economy';
+import { Budget } from './meta/budget';
 import { UpgradeShop } from './meta/upgrades';
 import { canRepair, repairBuilding, repairCost } from './meta/repair';
 import { loadSave, recordRun } from './meta/persistence';
@@ -32,6 +34,7 @@ import { Picking } from './render/picking';
 import { Hud } from './ui/hud';
 import { WindIndicator } from './ui/windIndicator';
 import { ShopUi } from './ui/shop';
+import { BudgetUi } from './ui/budgetUi';
 import { Toolbar } from './ui/toolbar';
 import { FireAlerts } from './ui/minimapAlerts';
 import { Screens } from './ui/screens';
@@ -53,7 +56,9 @@ export class Game {
   readonly waves: WaveDirector;
   readonly units: UnitManager;
   readonly civilians: CivilianManager;
+  readonly detection: DetectionSystem;
   readonly economy: Economy;
+  readonly budget: Budget;
   readonly shop = new UpgradeShop();
 
   private renderer: Renderer;
@@ -72,6 +77,7 @@ export class Game {
   private hud: Hud;
   private windUi: WindIndicator;
   private shopUi: ShopUi;
+  private budgetUi: BudgetUi;
   private toolbar: Toolbar;
   private alerts: FireAlerts;
   private screens = new Screens();
@@ -112,11 +118,14 @@ export class Game {
       this.city.stationDoor,
       this.city.pond,
     );
+    this.units.helipads = this.city.helipads;
     this.units.spawnEngine();
     this.units.spawnEngine();
     this.civilians = new CivilianManager(this.city.grid, this.city.roads, this.clusters, rng.fork(7));
+    this.detection = new DetectionSystem(this.clusters, this.civilians, this.events);
     this.units.obstacleCheck = (unit) => this.carAhead(unit);
     this.economy = new Economy(this.city.buildings, this.events, this.waves);
+    this.budget = new Budget(this.city.buildings, this.economy, this.units, this.shop, this.detection, this.events);
 
     // --- render ---
     const container = document.getElementById('app')!;
@@ -157,10 +166,15 @@ export class Game {
           this.toolbar.addHydrant();
           this.events.emit('toast', { text: 'Hydrant kit ready — use the toolbar to place it', kind: 'info' });
         },
+        setDetectionLevel: (level) => {
+          this.budget.upgradeDetectionMul = 1 - 0.25 * level;
+          this.budget.applyPolicy();
+        },
       },
       this.events,
     );
-    this.alerts = new FireAlerts(this.clusters, this.renderer.camera);
+    this.budgetUi = new BudgetUi(this.budget, this.events);
+    this.alerts = new FireAlerts(this.clusters, this.detection, this.renderer.camera);
 
     this.wireEvents();
     this.wireInput();
@@ -182,8 +196,9 @@ export class Game {
     this.events.on('waveStarted', ({ wave }) => {
       this.events.emit('toast', { text: `Wave ${wave} — stay sharp`, kind: 'info' });
     });
-    this.events.on('outbreak', () => {
-      this.events.emit('toast', { text: '🔥 Fire reported!', kind: 'warn' });
+    // outbreaks are silent: fires burn unnoticed until somebody calls them in
+    this.events.on('fireReported', () => {
+      this.events.emit('toast', { text: '🔥 911: fire reported!', kind: 'warn' });
     });
     this.events.on('gameOver', ({ score, wave }) => {
       const prev = loadSave();
@@ -248,6 +263,7 @@ export class Game {
         this.debugPanel.classList.toggle('open');
       } else if (e.code === 'Escape') {
         this.units.selected = null;
+        this.units.selectAll = false;
         this.toolbar.select('order');
       }
     });
@@ -285,7 +301,11 @@ export class Game {
       }
       return;
     }
-    this.units.orderAt(hit.point.x, hit.point.z);
+    if (this.units.orderAt(hit.point.x, hit.point.z)) {
+      // dispatching means the player knows about this fire
+      const near = this.clusters.nearestCluster(hit.point.x, hit.point.z);
+      if (near) this.detection.markKnown(near.id);
+    }
   }
 
   private tryRepair(voxel: { x: number; y: number; z: number }): void {
@@ -348,18 +368,24 @@ export class Game {
     }
   }
 
-  /** Civilian car directly ahead of a driving engine? (used to ease off, not stop) */
+  /** Vehicle directly ahead of a driving engine? (civilian cars and other engines) */
   private carAhead(unit: UnitBase): boolean {
     const hx = Math.cos(unit.heading);
     const hz = Math.sin(unit.heading);
+    const blocked = (ox: number, oz: number) => {
+      const dx = ox - unit.x;
+      const dz = oz - unit.z;
+      const ahead = dx * hx + dz * hz;
+      if (ahead < 0.5 || ahead > 3.5) return false;
+      return Math.abs(dx * -hz + dz * hx) < 1.0;
+    };
     for (const car of this.civilians.cars) {
       if (car.state === 'pullover') continue; // already clearing the lane
-      const dx = car.x - unit.x;
-      const dz = car.z - unit.z;
-      const ahead = dx * hx + dz * hz;
-      if (ahead < 0.5 || ahead > 3.5) continue;
-      const lateral = Math.abs(dx * -hz + dz * hx);
-      if (lateral < 1.0) return true;
+      if (blocked(car.x, car.z)) return true;
+    }
+    for (const other of this.units.units) {
+      if (other === unit || other.kind !== 'engine') continue;
+      if (blocked(other.x, other.z)) return true;
     }
     return false;
   }
@@ -385,6 +411,8 @@ export class Game {
       this.waves.update(dt);
       this.units.update(dt);
       this.civilians.update(dt, this.units.units);
+      this.detection.update(dt);
+      this.budget.update(dt);
       this.simAccumulator += dt;
       while (this.simAccumulator >= SIM.TICK_DT) {
         this.simAccumulator -= SIM.TICK_DT;
@@ -412,6 +440,11 @@ export class Game {
       this.hudAccumulator = 0;
       this.hud.update();
       this.shopUi.refresh();
+      this.budgetUi.refresh();
+      // a unit on scene means the fire is known — no surprise 911 toast later
+      for (const u of this.units.units) {
+        if (u.assignedCluster >= 0) this.detection.markKnown(u.assignedCluster);
+      }
       this.windUi.update(this.cameraRig.yaw, this.weather.label());
       this.alerts.update();
       this.pauseBtn.textContent = this.paused ? '▶' : '⏸';

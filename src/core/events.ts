@@ -7,6 +7,10 @@ export interface GameEvents {
   voxelDestroyed: { idx: number };
   buildingSettled: { buildingId: number; outcome: 'saved' | 'damaged' | 'lost'; damageRatio: number };
   outbreak: { x: number; z: number };
+  /** A fire has been called in (after the detection delay) — alerts may now show it. */
+  fireReported: { x: number; z: number };
+  /** Monthly budget settled. */
+  monthEnd: { month: number; tax: number; upkeep: number; net: number };
   waveStarted: { wave: number };
   waveCleared: { wave: number; bonus: number };
   toast: { text: string; kind: 'info' | 'warn' | 'good' };
