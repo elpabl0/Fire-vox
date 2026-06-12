@@ -88,6 +88,8 @@ export class Game {
   private fpsTimer = 0;
   private lastBrushAt = 0;
   private lastTrackAt = new Map<number, number>();
+  private pauseBtn = document.getElementById('btn-pause')!;
+  private hvBtn = document.getElementById('btn-hv')!;
 
   constructor(readonly seed: number) {
     // --- simulation (pure TS, no three.js) ---
@@ -193,9 +195,16 @@ export class Game {
 
   private wireInput(): void {
     const canvas = this.renderer.renderer.domElement;
+    // camera drag-pan yields to the paint brushes
+    this.cameraRig.allowDragPan = () => this.toolbar.tool !== 'fireBrush' && this.toolbar.tool !== 'waterBrush';
+
     let downX = 0;
     let downY = 0;
+    const activePointers = new Set<number>();
+    let multiTouch = false;
     canvas.addEventListener('pointerdown', (e) => {
+      activePointers.add(e.pointerId);
+      if (activePointers.size > 1) multiTouch = true;
       downX = e.clientX;
       downY = e.clientY;
       if (e.button === 0 && (this.toolbar.tool === 'fireBrush' || this.toolbar.tool === 'waterBrush')) {
@@ -203,21 +212,34 @@ export class Game {
       }
     });
     canvas.addEventListener('pointermove', (e) => {
-      // brushes paint while dragging with the primary button
+      // brushes paint while dragging with the primary button / touch contact
       if ((e.buttons & 1) !== 0 && (this.toolbar.tool === 'fireBrush' || this.toolbar.tool === 'waterBrush')) {
         if (this.time - this.lastBrushAt > 0.06) this.applyBrush(e.clientX, e.clientY);
       }
     });
-    canvas.addEventListener('pointerup', (e) => {
-      if (e.button !== 0) return;
-      if (this.toolbar.tool === 'fireBrush' || this.toolbar.tool === 'waterBrush') return;
-      if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) return; // drag, not click
-      this.onClick(e.clientX, e.clientY, e.shiftKey);
-    });
+    const endPointer = (e: PointerEvent) => {
+      activePointers.delete(e.pointerId);
+      if (activePointers.size === 0) {
+        const wasMulti = multiTouch;
+        multiTouch = false;
+        if (wasMulti) return; // pinch/rotate gesture, not a tap
+        if (e.type === 'pointercancel' || e.button !== 0) return;
+        if (this.toolbar.tool === 'fireBrush' || this.toolbar.tool === 'waterBrush') return;
+        if (Math.hypot(e.clientX - downX, e.clientY - downY) > 9) return; // drag, not a tap
+        this.onClick(e.clientX, e.clientY, e.shiftKey);
+      }
+    };
+    canvas.addEventListener('pointerup', endPointer);
+    canvas.addEventListener('pointercancel', endPointer);
+
+    // on-screen buttons (mobile has no keyboard)
+    this.pauseBtn.addEventListener('click', () => this.togglePause());
+    this.hvBtn.addEventListener('click', () => this.heatVision.toggle());
+
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') {
         e.preventDefault();
-        if (this.started && !this.economy.isGameOver) this.paused = !this.paused;
+        this.togglePause();
       } else if (e.code === 'KeyH') {
         this.heatVision.toggle();
       } else if (e.code === 'KeyR') {
@@ -229,6 +251,10 @@ export class Game {
         this.toolbar.select('order');
       }
     });
+  }
+
+  private togglePause(): void {
+    if (this.started && !this.economy.isGameOver) this.paused = !this.paused;
   }
 
   private onClick(x: number, y: number, shift: boolean): void {
@@ -388,6 +414,9 @@ export class Game {
       this.shopUi.refresh();
       this.windUi.update(this.cameraRig.yaw, this.weather.label());
       this.alerts.update();
+      this.pauseBtn.textContent = this.paused ? '▶' : '⏸';
+      this.hvBtn.style.display = this.heatVision.unlocked ? '' : 'none';
+      this.hvBtn.classList.toggle('active', this.heatVision.enabled);
       if (this.debugPanel.classList.contains('open')) this.updateDebug();
     }
 

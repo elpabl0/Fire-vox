@@ -11,9 +11,10 @@ export class Screens {
       and watch the wind — it carries embers to new rooftops. Earn cash for every
       blaze contained and invest in your fire department to survive escalating waves.</p>
       <p>
-        <b>Left-click</b> a fire to dispatch &nbsp;·&nbsp; <b>click a unit</b> to select &nbsp;·&nbsp;
-        <b>WASD</b> pan &nbsp;·&nbsp; <b>right-drag / Q,E</b> rotate &nbsp;·&nbsp; <b>wheel</b> zoom
-        &nbsp;·&nbsp; <b>H</b> heat vision (once purchased) &nbsp;·&nbsp; <b>Space</b> pause
+        <b>Tap/click</b> a fire to dispatch &nbsp;·&nbsp; <b>tap a unit</b> to select &nbsp;·&nbsp;
+        <b>drag / WASD</b> pan &nbsp;·&nbsp; <b>pinch / wheel</b> zoom &nbsp;·&nbsp;
+        <b>twist / right-drag / Q,E</b> rotate &nbsp;·&nbsp;
+        <b>H</b> heat vision (once purchased) &nbsp;·&nbsp; <b>Space</b> pause
       </p>
       ${save.highScore > 0 ? `<div id="screen-stats">High score: ${save.highScore} · Best wave: ${save.bestWave}</div>` : ''}
       <p style="font-size:12px">City seed: ${seed} (set ?seed=N in the URL to replay a map)</p>
