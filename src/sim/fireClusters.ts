@@ -163,6 +163,26 @@ export class FireClusterizer {
     return (fx / len) * this.wind.dirX + (fz / len) * this.wind.dirZ;
   }
 
+  /**
+   * Nearest cluster measured to its closest perimeter voxel (not the centroid,
+   * which drifts away from bystanders as a fire grows). Used for the
+   * close-proximity self-engagement radius.
+   */
+  nearestBurning(x: number, z: number): { cluster: FireCluster; dist: number } | null {
+    let best: { cluster: FireCluster; dist: number } | null = null;
+    for (const c of this.clusters) {
+      let d = Math.hypot(c.cx - x, c.cz - z);
+      for (const voxel of c.perimeter) {
+        const vx = Math.floor(voxel / (D * H));
+        const vz = Math.floor(voxel / H) % D;
+        const vd = Math.hypot(vx - x, vz - z);
+        if (vd < d) d = vd;
+      }
+      if (!best || d < best.dist) best = { cluster: c, dist: d };
+    }
+    return best;
+  }
+
   nearestCluster(x: number, z: number): FireCluster | null {
     let best: FireCluster | null = null;
     let bestD = Infinity;

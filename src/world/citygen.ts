@@ -139,6 +139,7 @@ export function generateCity(seed: number): City {
     }
   }
 
+  grid.snapshotOriginal();
   grid.markAllDirty();
   return { grid, roads, buildings, stationDoor, pond };
 }
@@ -180,7 +181,7 @@ function stampPond(grid: VoxelGrid, block: Block): { x: number; z: number } {
 function stampPark(grid: VoxelGrid, rng: Rng, block: Block): void {
   for (let x = block.x0 + 1; x <= block.x1 - 1; x++) {
     for (let z = block.z0 + 1; z <= block.z1 - 1; z++) {
-      if (rng.chance(0.05)) stampTree(grid, rng, x, z);
+      if (rng.chance(0.09)) stampTree(grid, rng, x, z);
       else if (rng.chance(0.02)) grid.setVoxel(x, 0, z, Mat.DIRT); // bare patches
     }
   }
@@ -280,10 +281,10 @@ function placeStation(
   if (!best) {
     // degenerate map: drop a pad in the first block
     const bl = blocks[0];
-    best = makeBuilding(buildings.length, 'station', 0, bl.x0 + 2, bl.z0 + 2, bl.x0 + 6, bl.z0 + 6);
+    best = makeBuilding(buildings.length, 'station', 0, bl.x0 + 2, bl.z0 + 2, bl.x0 + 8, bl.z0 + 8);
     buildings.push(best);
   } else {
-    // clear the old building voxels
+    // clear the old building voxels and grow into the lot margin for presence
     for (let x = best.x0; x <= best.x1; x++) {
       for (let z = best.z0; z <= best.z1; z++) {
         for (let y = 1; y < GRID.H; y++) {
@@ -291,12 +292,41 @@ function placeStation(
         }
       }
     }
+    best.x0 -= 1;
+    best.z0 -= 1;
+    best.x1 += 1;
+    best.z1 += 1;
   }
   best.kind = 'station';
   best.lotValue = 0;
   best.totalVoxels = 0;
-  stampStation(grid, best);
+  // face the side closest to a road
+  const midX = (best.x0 + best.x1) / 2;
+  const midZ = (best.z0 + best.z1) / 2;
+  const edgeDist = (x: number, z: number) => {
+    const cx = Math.max(0, Math.min(W - 1, Math.round(x)));
+    const cz = Math.max(0, Math.min(D - 1, Math.round(z)));
+    return roads.distToRoad[cx * D + cz];
+  };
+  const dists = [
+    edgeDist(best.x1 + 1, midZ), // 0: +x
+    edgeDist(best.x0 - 1, midZ), // 1: -x
+    edgeDist(midX, best.z1 + 1), // 2: +z
+    edgeDist(midX, best.z0 - 1), // 3: -z
+  ];
+  let facing = 0;
+  for (let i = 1; i < 4; i++) if (dists[i] < dists[facing]) facing = i;
+  stampStation(grid, best, facing);
   void rng;
-  const mid = roads.nearestRoadCell((best.x0 + best.x1) / 2, (best.z0 + best.z1) / 2);
+  // door: road cell outside the facing wall
+  const doorPoint =
+    facing === 0
+      ? { x: best.x1 + 2, z: midZ }
+      : facing === 1
+        ? { x: best.x0 - 2, z: midZ }
+        : facing === 2
+          ? { x: midX, z: best.z1 + 2 }
+          : { x: midX, z: best.z0 - 2 };
+  const mid = roads.nearestRoadCell(doorPoint.x, doorPoint.z);
   return mid ?? { x: best.x0, z: best.z0 };
 }

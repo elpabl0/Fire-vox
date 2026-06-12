@@ -66,9 +66,9 @@ export class CameraRig {
   private panBy(right: number, forward: number): void {
     const sin = Math.sin(this.yaw);
     const cos = Math.cos(this.yaw);
-    // camera-relative pan on the ground plane
-    this.target.x += cos * forward + -sin * right;
-    this.target.z += sin * forward + cos * right;
+    // camera-relative pan on the ground plane: screen-up = -(cos,sin), screen-right = (sin,-cos)
+    this.target.x += cos * forward + sin * right;
+    this.target.z += sin * forward + -cos * right;
     this.target.x = clamp(this.target.x, 0, GRID.W);
     this.target.z = clamp(this.target.z, 0, GRID.D);
   }

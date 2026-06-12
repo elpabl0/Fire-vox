@@ -137,6 +137,43 @@
     }
     #debug-panel.open { display: block; }
 
+    #toolbar {
+      position: absolute; bottom: 12px; left: 12px;
+      display: flex; gap: 6px;
+    }
+    .tool-btn {
+      background: var(--hud-bg);
+      border: 1px solid var(--hud-border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 13px; cursor: pointer;
+      position: relative;
+    }
+    .tool-btn:hover { border-color: var(--accent2); }
+    .tool-btn.active { border-color: var(--accent); box-shadow: 0 0 8px rgba(255,140,58,0.4); }
+    .tool-btn:disabled { opacity: 0.35; cursor: default; }
+    .tool-btn .badge {
+      position: absolute; top: -6px; right: -6px;
+      background: var(--accent2); color: #08121c;
+      font-size: 10px; font-weight: 700;
+      border-radius: 8px; padding: 1px 5px;
+    }
+
+    #dev-panel {
+      position: absolute; top: 120px; right: 10px;
+      display: none; flex-direction: column; gap: 6px;
+      border-color: #b07fe0;
+    }
+    #dev-panel.open { display: flex; }
+    #dev-panel h4 { margin: 0 0 2px; font-size: 11px; color: #b07fe0; text-transform: uppercase; letter-spacing: 0.08em; }
+    #dev-panel button {
+      background: #241a30; color: var(--text);
+      border: 1px solid rgba(176,127,224,0.4); border-radius: 6px;
+      padding: 6px 10px; font-size: 12px; cursor: pointer;
+    }
+    #dev-panel button.active { border-color: #b07fe0; box-shadow: 0 0 8px rgba(176,127,224,0.5); }
+
     #screen-overlay {
       position: absolute; inset: 0;
       background: rgba(6, 9, 14, 0.88);
@@ -198,6 +235,17 @@
       <div id="shop-items"></div>
     </div>
     <div id="toast-area"></div>
+    <div id="toolbar">
+      <button class="tool-btn active" id="tool-order" title="Dispatch / select units">🚒 Dispatch</button>
+      <button class="tool-btn" id="tool-repair" title="Repair a damaged building (cost scales with damage)">🔧 Repair</button>
+      <button class="tool-btn" id="tool-hydrant" title="Place a hydrant near a road" disabled>⛲ Hydrant<span class="badge" id="hydrant-count" style="display:none">0</span></button>
+    </div>
+    <div id="dev-panel" class="panel">
+      <h4>Dev Mode</h4>
+      <button id="dev-fire">🔥 Fire brush</button>
+      <button id="dev-water">💧 Water brush</button>
+      <button id="dev-cash">💰 +$1000</button>
+    </div>
     <div id="debug-panel" class="panel"></div>
     <div id="screen-overlay"></div>
   </div>

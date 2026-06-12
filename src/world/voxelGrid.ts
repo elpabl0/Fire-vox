@@ -16,6 +16,15 @@ export class VoxelGrid {
   readonly flags = new Uint8Array(W * D * H);
   /** Building/lot id per voxel; 0 = none. */
   readonly owner = new Uint16Array(W * D * H);
+  /** Pristine post-generation state, captured once — the repair tool restores from these. */
+  readonly originalMaterial = new Uint8Array(W * D * H);
+  readonly originalOwner = new Uint16Array(W * D * H);
+
+  /** Capture the pristine city state. Call once at the end of generation. */
+  snapshotOriginal(): void {
+    this.originalMaterial.set(this.material);
+    this.originalOwner.set(this.owner);
+  }
 
   /** Chunk ids needing a mesh rebuild, drained by the renderer. */
   readonly dirtyChunks = new Set<number>();

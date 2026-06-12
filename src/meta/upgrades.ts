@@ -5,6 +5,8 @@ export interface UpgradeContext {
   units: UnitManager;
   /** Toggles availability of the heat-vision overlay (render layer reads this). */
   unlockHeatVision(): void;
+  /** Adds one placeable hydrant to the player's inventory. */
+  grantHydrant(): void;
 }
 
 export interface UpgradeDef {
@@ -45,6 +47,24 @@ export const UPGRADES: UpgradeDef[] = [
     costMult: 1,
     maxLevel: 1,
     apply: (ctx) => ctx.unlockHeatVision(),
+  },
+  {
+    id: 'crew',
+    name: 'Firefighter Crew',
+    desc: '+1 firefighter rides each engine, running hand lines on foot',
+    baseCost: 140,
+    costMult: 1.7,
+    maxLevel: 2,
+    apply: (ctx, level) => ctx.units.setCrewLevel(level),
+  },
+  {
+    id: 'hydrant',
+    name: 'Hydrant Kit',
+    desc: 'A placeable hydrant — engines refill at the nearest water point',
+    baseCost: 70,
+    costMult: 1.25,
+    maxLevel: 8,
+    apply: (ctx) => ctx.grantHydrant(),
   },
   {
     id: 'hoseRange',

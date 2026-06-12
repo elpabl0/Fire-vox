@@ -63,19 +63,20 @@ export class WaterFx {
   }
 
   update(time: number, dt: number): void {
-    // emit droplets from spraying units
-    for (const unit of this.units.units) {
+    // emit droplets from spraying units (engines, crew hand-lines, helicopters)
+    for (const unit of this.units.allUnits) {
       if (!unit.spraying) continue;
-      if (unit.kind === 'engine' && unit.targetVoxel >= 0) {
+      if (unit.kind !== 'helicopter' && unit.targetVoxel >= 0) {
         const tx = Math.floor(unit.targetVoxel / (D * H)) + 0.5;
         const tz = (Math.floor(unit.targetVoxel / H) % D) + 0.5;
         const ty = (unit.targetVoxel % H) + 0.5;
-        const arc = ballisticVelocity(unit.x, 2.0, unit.z, tx, ty, tz, GRAVITY, 3.5);
-        const perFrame = Math.max(1, Math.round(dt * 240));
+        const nozzleY = unit.kind === 'engine' ? 2.0 : 1.2;
+        const arc = ballisticVelocity(unit.x, nozzleY, unit.z, tx, ty, tz, GRAVITY, unit.kind === 'engine' ? 3.5 : 1.8);
+        const perFrame = Math.max(1, Math.round(dt * (unit.kind === 'engine' ? 240 : 110)));
         for (let i = 0; i < perFrame; i++) {
           this.spawnDroplet(
             unit.x,
-            2.0,
+            nozzleY,
             unit.z,
             arc.vx + this.rng.range(-0.5, 0.5),
             arc.vy + this.rng.range(-0.3, 0.3),
@@ -113,7 +114,8 @@ export class WaterFx {
         // impact: splash and retire (hide far below the map)
         this.splash.spawn(time, this.positions[o], Math.max(1, this.positions[o + 1]) + 0.3, this.positions[o + 2], this.rng.range(-1, 1), this.rng.range(0.5, 1.5), this.rng.range(-1, 1), this.rng.range(0.3, 0.6), 1, this.rng.next());
         this.ttl[i] = 0;
-        this.positions[o + 1] = -100;
+        // park retired droplets far outside the camera frustum
+        this.positions[o + 1] = -1e6;
       } else {
         live++;
       }

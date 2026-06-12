@@ -21,6 +21,9 @@ export class WaveDirector {
   private graceLeft = 5; // initial calm before wave 1
   private waveActive = false;
 
+  /** Early-wave outbreaks are biased near this point (the fire HQ). */
+  origin = { x: GRID.W / 2, z: GRID.D / 2 };
+
   constructor(
     private grid: VoxelGrid,
     private buildings: Building[],
@@ -87,6 +90,7 @@ export class WaveDirector {
 
   private pickTarget(): { x: number; z: number } | null {
     const allowIndustrial = this.wave >= WAVES.INDUSTRIAL_FROM_WAVE;
+    const radius = WAVES.targetRadius(this.wave);
     // 75%: a building; 25%: vegetation (random grass/tree spot)
     if (this.rng.chance(0.75)) {
       const candidates: Building[] = [];
@@ -94,6 +98,7 @@ export class WaveDirector {
         const b = this.buildings[i];
         if (b.kind === 'station') continue;
         if (!allowIndustrial && (b.kind === 'industrial' || b.kind === 'tower')) continue;
+        if (Math.hypot((b.x0 + b.x1) / 2 - this.origin.x, (b.z0 + b.z1) / 2 - this.origin.z) > radius) continue;
         candidates.push(b);
       }
       if (candidates.length > 0) {
@@ -101,10 +106,11 @@ export class WaveDirector {
         return { x: this.rng.int(b.x0, b.x1), z: this.rng.int(b.z0, b.z1) };
       }
     }
-    // vegetation: rejection-sample a flammable ground cell
+    // vegetation: rejection-sample a flammable ground cell within the wave radius
     for (let attempt = 0; attempt < 30; attempt++) {
       const x = this.rng.int(0, W - 1);
       const z = this.rng.int(0, D - 1);
+      if (Math.hypot(x - this.origin.x, z - this.origin.z) > radius) continue;
       const ty = this.grid.topY(x, z);
       if (ty < 0) continue;
       const mat = this.grid.material[this.grid.idx(x, ty, z)];

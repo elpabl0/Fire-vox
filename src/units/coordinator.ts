@@ -80,17 +80,18 @@ export class Coordinator {
   }
 
   /**
-   * Hand the unit the best unclaimed perimeter voxel of its cluster that is
-   * within hose range of its current spot, keeping spacing from other claims.
+   * Hand the unit the best unclaimed perimeter voxel of its cluster within
+   * `reach` of its current spot, keeping spacing from other claims. Without an
+   * assigned cluster, only fires in close proximity are considered — dispatch
+   * across the map is the player's job.
    */
-  requestTarget(unit: UnitBase): number {
+  requestTarget(unit: UnitBase, reach = unit.stats.hoseRange): number {
     const cluster = this.clusters.byId(unit.assignedCluster);
     if (!cluster) {
-      // no assignment: take the nearest cluster if any
-      const near = this.clusters.nearestCluster(unit.x, unit.z);
-      if (!near) return -1;
-      unit.assignedCluster = near.id;
-      return this.requestTarget(unit);
+      const near = this.clusters.nearestBurning(unit.x, unit.z);
+      if (!near || near.dist > UNITS.ENGINE.engageRadius) return -1;
+      unit.assignedCluster = near.cluster.id;
+      return this.requestTarget(unit, reach);
     }
     this.releaseTarget(unit);
     let fallback = -1;
@@ -99,7 +100,7 @@ export class Coordinator {
       if (!(this.grid.flags[voxel] & Flag.BURNING)) continue;
       const vx = Math.floor(voxel / (D * H));
       const vz = Math.floor(voxel / H) % D;
-      if (Math.hypot(vx - unit.x, vz - unit.z) > unit.stats.hoseRange) continue;
+      if (Math.hypot(vx - unit.x, vz - unit.z) > reach) continue;
       if (this.tooCloseToOtherClaim(vx, vz, unit.id)) {
         if (fallback < 0) fallback = voxel;
         continue;
@@ -118,8 +119,13 @@ export class Coordinator {
    * far side instead of giving up.
    */
   requestEngagement(unit: UnitBase): { voxel: number; spotX: number; spotZ: number } | null {
-    const cluster = this.clusters.byId(unit.assignedCluster) ?? this.clusters.nearestCluster(unit.x, unit.z);
-    if (!cluster) return null;
+    let cluster = this.clusters.byId(unit.assignedCluster);
+    if (!cluster) {
+      // no assignment: only fires in close proximity — never auto-dispatch across the map
+      const near = this.clusters.nearestBurning(unit.x, unit.z);
+      if (!near || near.dist > UNITS.ENGINE.engageRadius) return null;
+      cluster = near.cluster;
+    }
     unit.assignedCluster = cluster.id;
     this.releaseTarget(unit);
     let fallback: { voxel: number; spotX: number; spotZ: number } | null = null;

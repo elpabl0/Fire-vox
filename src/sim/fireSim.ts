@@ -42,6 +42,11 @@ export class FireSim {
   /** Rotating-slice cursor for the MAX_FIRE_PER_TICK safety valve. */
   private sliceCursor = 0;
 
+  /** Weather hooks: ignition probability multiplier (rain/snow suppress spread). */
+  environmentSpreadMul = 1;
+  /** Heat removed per tick from sky-exposed burning voxels (rain dousing). */
+  rainDouse = 0;
+
   // run stats
   totalExtinguished = 0;
   totalBurnedOut = 0;
@@ -114,7 +119,10 @@ export class FireSim {
     this.coolPhase();
     this.decayWet();
     const collapsed = this.collapse.tick();
-    for (const idx of collapsed) this.onVoxelDestroyed(idx, true);
+    for (const idx of collapsed) {
+      this.onVoxelDestroyed(idx, true);
+      this.maybeDropRubble(Math.floor(idx / (D * H)), idx % H, Math.floor(idx / H) % D);
+    }
     this.settlePhase();
     this.lastTickMs = performance.now() - t0;
   }
@@ -159,10 +167,16 @@ export class FireSim {
       return;
     }
     this.radiate(idx, def.heatOutput);
-    // ember spot fires from exposed (sky-open) burning voxels
     const y = idx % H;
-    if (y + 1 < H && grid.material[idx + 1] === Mat.AIR && this.wind.strength > 0.2) {
-      if (this.rng.chance(SIM.EMBER_CHANCE * this.wind.strength)) {
+    const skyExposed = y + 1 >= H || grid.material[idx + 1] === Mat.AIR;
+    // rain douses exposed fires (coolVoxel also wets them)
+    if (this.rainDouse > 0 && skyExposed) {
+      this.coolVoxel(idx, this.rainDouse / SIM.WATER_COOL);
+      if (!(grid.flags[idx] & Flag.BURNING)) return;
+    }
+    // ember spot fires from exposed burning voxels
+    if (skyExposed && this.wind.strength > 0.2) {
+      if (this.rng.chance(SIM.EMBER_CHANCE * this.wind.strength * this.environmentSpreadMul)) {
         this.throwEmber(idx);
       }
     }
@@ -202,7 +216,7 @@ export class FireSim {
       if (grid.fuel[nIdx] > 0) {
         const nDef = MATERIALS[nMat];
         if (grid.heat[nIdx] > nDef.ignitionHeat) {
-          if (this.rng.chance(nDef.flammability * SIM.SPREAD_RATE * wetMul * windMul * vertMul)) {
+          if (this.rng.chance(nDef.flammability * SIM.SPREAD_RATE * wetMul * windMul * vertMul * this.environmentSpreadMul)) {
             this.ignitionQueue.push(nIdx);
           }
         }
@@ -244,10 +258,38 @@ export class FireSim {
       grid.fuel[idx] = 0;
       grid.flags[idx] |= Flag.DESTROYED;
       this.onVoxelDestroyed(idx, false);
+      this.maybeDropRubble(x, y, z);
       this.collapse.onDestroyed(x, y, z);
     }
     grid.markDirtyIdx(idx);
     this.events.emit('burnedOut', { idx });
+  }
+
+  /** Debris from destroyed voxels piles up on whatever remains below. */
+  private maybeDropRubble(x: number, y: number, z: number): void {
+    if (!this.rng.chance(SIM.RUBBLE_CHANCE)) return;
+    const base = (x * D + z) * H;
+    for (let ry = y - 1; ry >= 0; ry--) {
+      if (this.grid.material[base + ry] !== Mat.AIR) {
+        const slot = ry + 1;
+        if (slot < H && this.grid.material[base + slot] === Mat.AIR) {
+          this.grid.setVoxel(x, slot, z, Mat.RUBBLE, 0);
+          this.grid.markDirty(x, z);
+        }
+        return;
+      }
+    }
+  }
+
+  /** Strip all sim state from a voxel (used by the repair tool before restoring it). */
+  clearVoxelState(idx: number): void {
+    if (this.grid.flags[idx] & Flag.BURNING) {
+      this.activeFire.delete(idx);
+      this.onFireLeftVoxel(idx);
+    }
+    this.hotCells.delete(idx);
+    this.wetTicks.delete(idx);
+    this.grid.heat[idx] = 0;
   }
 
   /** Shared bookkeeping when a voxel stops burning for any reason. */

@@ -17,6 +17,8 @@ export class Wind {
   private targetStrength: number;
   private retargetIn: number;
   strengthCap = 1;
+  /** Minimum strength forced by storms. */
+  strengthFloor = 0;
 
   constructor(private rng: Rng) {
     this.angle = rng.range(0, Math.PI * 2);
@@ -36,6 +38,7 @@ export class Wind {
     const t = 1 - Math.exp(-WIND.LERP_RATE * dt * 20);
     this.angle = lerpAngle(this.angle, this.targetAngle, t * 0.2);
     this.strength = lerp(this.strength, Math.min(this.targetStrength, this.strengthCap), t * 0.2);
+    this.strength = Math.min(1, Math.max(this.strength, this.strengthFloor));
     this.updateDir();
   }
 

@@ -6,17 +6,21 @@ const { D, H } = GRID;
 /**
  * Free-flying water bomber: fills at the pond, drops on the hottest core of its
  * assigned cluster — complementing road-bound engines that work the perimeter.
+ * Returns to the HQ pad and lands when there is nothing to fight.
  */
 export class Helicopter extends UnitBase {
   readonly kind = 'helicopter' as const;
   readonly name = 'Helicopter';
-  private _state: HeliState = 'idle';
+  private _state: HeliState = 'landed';
   private dropTimer = 0;
+  /** Rotor speed factor for the renderer (spins down when landed). */
+  rotorSpeed = 0;
   cruiseY = UNITS.HELICOPTER.altitude;
+  private targetY = 1.2;
 
   constructor(stats: UnitStats) {
     super(stats);
-    this.y = this.cruiseY;
+    this.y = 1.2;
   }
 
   get state(): string {
@@ -27,18 +31,35 @@ export class Helicopter extends UnitBase {
     const cluster = ctx.clusters.nearestCluster(x, z);
     this.assignedCluster = cluster ? cluster.id : -1;
     if (this.assignedCluster >= 0) {
+      this.orderedTarget = { x, z };
       this._state = this.water > 0 ? 'toFire' : 'toWater';
     }
   }
 
   update(dt: number, ctx: UnitContext): void {
-    this.y = this.cruiseY;
     const cluster = ctx.clusters.byId(this.assignedCluster);
+    const airborne = this._state !== 'landed';
+    this.targetY = airborne ? this.cruiseY : 1.2;
+    this.y += (this.targetY - this.y) * Math.min(1, dt * 1.6);
+    const rotorTarget = airborne ? 1 : 0;
+    this.rotorSpeed += (rotorTarget - this.rotorSpeed) * Math.min(1, dt * 0.8);
+
     switch (this._state) {
-      case 'idle':
+      case 'landed':
         this.spraying = false;
+        if (cluster && cluster.size > 0) this._state = this.water > 0 ? 'toFire' : 'toWater';
+        break;
+      case 'idle':
+      case 'toBase':
+        this.spraying = false;
+        this._state = 'toBase';
         if (cluster && cluster.size > 0) {
           this._state = this.water > 0 ? 'toFire' : 'toWater';
+          break;
+        }
+        if (this.moveToward(ctx.stationDoor.x, ctx.stationDoor.z, dt)) {
+          this._state = 'landed';
+          this.orderedTarget = null;
         }
         break;
       case 'toWater':
@@ -47,14 +68,18 @@ export class Helicopter extends UnitBase {
       case 'filling':
         this.water = Math.min(this.stats.waterMax, this.water + UNITS.HELICOPTER.fillRate * dt);
         if (this.water >= this.stats.waterMax) {
-          this._state = cluster && cluster.size > 0 ? 'toFire' : 'idle';
-          if (this._state === 'idle') this.assignedCluster = -1;
+          if (cluster && cluster.size > 0) {
+            this._state = 'toFire';
+          } else {
+            this.assignedCluster = -1;
+            this._state = 'toBase';
+          }
         }
         break;
       case 'toFire': {
         if (!cluster || cluster.size === 0) {
           this.assignedCluster = -1;
-          this._state = 'idle';
+          this._state = 'toBase';
           break;
         }
         const core = cluster.coreIdx;
@@ -63,6 +88,7 @@ export class Helicopter extends UnitBase {
         if (this.moveToward(tx, tz, dt)) {
           this._state = 'dropping';
           this.dropTimer = 0.8;
+          this.orderedTarget = null;
         }
         break;
       }
@@ -73,8 +99,12 @@ export class Helicopter extends UnitBase {
           ctx.water.dropArea(this.x, this.z, UNITS.HELICOPTER.dropRadius, this.water);
           this.water = 0;
           this.spraying = false;
-          this._state = cluster && cluster.size > 0 ? 'toWater' : 'idle';
-          if (this._state === 'idle') this.assignedCluster = -1;
+          if (cluster && cluster.size > 0) {
+            this._state = 'toWater';
+          } else {
+            this.assignedCluster = -1;
+            this._state = 'toBase';
+          }
         }
         break;
     }

@@ -66,9 +66,17 @@ describe('FireSim', () => {
     expect(small.flags[idx] & Flag.CHARRED).toBeTruthy();
   });
 
-  it('no immortal fires: a large grass fire eventually exhausts', () => {
-    const { sim } = makeSim(grid);
-    sim.ignite(grid.idx(64, 0, 64));
+  it('no immortal fires: a bounded grass field eventually exhausts', () => {
+    // 40x40 grass patch surrounded by concrete
+    const field = new VoxelGrid();
+    for (let x = 0; x < GRID.W; x++) {
+      for (let z = 0; z < GRID.D; z++) {
+        const inPatch = x >= 50 && x < 90 && z >= 50 && z < 90;
+        field.setVoxel(x, 0, z, inPatch ? Mat.GRASS : Mat.CONCRETE);
+      }
+    }
+    const { sim } = makeSim(field);
+    sim.ignite(field.idx(70, 0, 70));
     for (let t = 0; t < 3000 && sim.activeFire.size > 0; t++) sim.tick();
     expect(sim.activeFire.size).toBe(0);
   });

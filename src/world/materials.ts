@@ -17,10 +17,13 @@ export const enum Mat {
   LEAVES = 14,
   FUEL_TANK = 15,
   CAR = 16,
-  STATION = 17, // fire station pad (inert)
+  STATION = 17, // fire station brick (inert)
+  RUBBLE = 18, // debris dropped by destroyed voxels
+  STATION_TRIM = 19, // white band/roof on the fire HQ
+  STATION_DOOR = 20, // garage bay doors
 }
 
-export const MAT_COUNT = 18;
+export const MAT_COUNT = 21;
 
 export interface MaterialDef {
   name: string;
@@ -65,6 +68,9 @@ MATERIALS[Mat.LEAVES] = M({ name: 'leaves', colorTop: 0x4d8c3c, colorSide: 0x447
 MATERIALS[Mat.FUEL_TANK] = M({ name: 'fuel tank', colorTop: 0xd8d4cc, colorSide: 0xc8c4bc, colorCharred: 0x33302c, flammability: 0.5, ignitionHeat: 50, fuelTicks: 140, heatOutput: 26, smokeRate: 2.2, destroyOnBurnout: 0.6, structural: true });
 MATERIALS[Mat.CAR] = M({ name: 'car', colorTop: 0xc05050, colorSide: 0xb04848, colorCharred: 0x35302e, flammability: 0.4, ignitionHeat: 42, fuelTicks: 70, heatOutput: 12, smokeRate: 1.6, destroyOnBurnout: 0.2, structural: false });
 MATERIALS[Mat.STATION] = M({ name: 'fire station', colorTop: 0xc44848, colorSide: 0xb04040, colorCharred: 0x5a2a2a, flammability: 0, ignitionHeat: 1e9, fuelTicks: 0, heatOutput: 0, smokeRate: 0, destroyOnBurnout: 0, structural: true });
+MATERIALS[Mat.RUBBLE] = M({ name: 'rubble', colorTop: 0x6b655c, colorSide: 0x5d574f, colorCharred: 0x3a3631, flammability: 0, ignitionHeat: 1e9, fuelTicks: 0, heatOutput: 0, smokeRate: 0, destroyOnBurnout: 0, structural: false });
+MATERIALS[Mat.STATION_TRIM] = M({ name: 'station trim', colorTop: 0xeceae4, colorSide: 0xdedcd4, colorCharred: 0x6a6862, flammability: 0, ignitionHeat: 1e9, fuelTicks: 0, heatOutput: 0, smokeRate: 0, destroyOnBurnout: 0, structural: true });
+MATERIALS[Mat.STATION_DOOR] = M({ name: 'station door', colorTop: 0x4a5560, colorSide: 0x3e4954, colorCharred: 0x2a3038, flammability: 0, ignitionHeat: 1e9, fuelTicks: 0, heatOutput: 0, smokeRate: 0, destroyOnBurnout: 0, structural: true });
 
 /** Voxel flag bits (flags Uint8Array). */
 export const enum Flag {

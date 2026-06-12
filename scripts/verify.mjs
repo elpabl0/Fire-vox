@@ -1,6 +1,6 @@
 /**
- * Headless browser smoke test: boots the game, starts a run, ignites a fire,
- * lets the engine AI respond autonomously, and tracks containment over time.
+ * Headless browser smoke test: boots the game, starts a run, ignites a fire
+ * near the HQ, dispatches engines (player-style), and tracks containment.
  * Run with: node scripts/verify.mjs (requires `npm run build` + playwright chromium)
  */
 import { chromium } from 'playwright';
@@ -23,35 +23,77 @@ await page.click('#start-btn');
 await page.waitForTimeout(1500);
 await page.screenshot({ path: '/tmp/fv-2-city.png' });
 
-// ignite a small fresh outbreak near the centre (like a wave ignition)
-const ignited = await page.evaluate(() => {
+// torch the nearest wooden house to the HQ (spreads properly), then dispatch both engines
+const setup = await page.evaluate(() => {
   const g = window.game;
-  let lit = 0;
-  for (const [x, z] of [[60, 60], [61, 60]]) {
+  const door = g.city.stationDoor;
+  let best = null;
+  let bestD = Infinity;
+  for (const b of g.city.buildings) {
+    if (b.kind !== 'house') continue;
+    const d = Math.hypot((b.x0 + b.x1) / 2 - door.x, (b.z0 + b.z1) / 2 - door.z);
+    if (d > 14 && d < bestD) {
+      bestD = d;
+      best = b;
+    }
+  }
+  const fx = Math.round((best.x0 + best.x1) / 2);
+  const fz = Math.round((best.z0 + best.z1) / 2);
+  for (const [x, z] of [[fx, fz], [fx + 1, fz]]) {
     const y = g.city.grid.topY(x, z);
-    if (y >= 0 && g.fire.ignite(g.city.grid.idx(x, y, z))) lit++;
+    if (y >= 0) g.fire.ignite(g.city.grid.idx(x, y, z));
   }
-  return lit;
+  return { door, fx, fz, dist: bestD };
 });
-console.log('ignited voxels:', ignited);
+console.log('outbreak at', setup.fx, setup.fz, 'door', setup.door);
 
-// watch the AI respond for 90s of game time
-for (let t = 10; t <= 90; t += 10) {
-  await page.waitForTimeout(10000);
-  const s = await page.evaluate(() => ({
-    fire: window.game.fire.activeFire.size,
-    ext: window.game.fire.totalExtinguished,
-    burned: window.game.fire.totalBurnedOut,
-    units: window.game.units.units.map((u) => `${u.state} w=${u.water.toFixed(0)}`),
-    tickMs: window.game.fire.lastTickMs.toFixed(2),
-  }));
-  console.log(`t=${t}s fire=${s.fire} extinguished=${s.ext} burnedOut=${s.burned} tick=${s.tickMs}ms units=[${s.units.join(' | ')}]`);
-  if (t === 30) await page.screenshot({ path: '/tmp/fv-3-fire.png' });
-  if (s.fire === 0 && t >= 30) {
-    console.log('CONTAINED');
-    break;
+// give the clusterizer a beat, then dispatch like a player click
+await page.waitForTimeout(1500);
+await page.evaluate(({ fx, fz }) => {
+  const g = window.game;
+  for (const u of g.units.units) {
+    g.units.selected = u;
+    g.units.orderAt(fx, fz);
   }
+  g.units.selected = null;
+}, setup);
+
+// play like an active commander for 3 minutes: idle engines get dispatched
+// to the nearest cluster every 10s (the player's job)
+let contained = false;
+for (let t = 10; t <= 180; t += 10) {
+  await page.waitForTimeout(10000);
+  const s = await page.evaluate(() => {
+    const g = window.game;
+    for (const u of g.units.units) {
+      if (u.state !== 'idle') continue;
+      const near = g.clusters.nearestCluster(u.x, u.z);
+      if (near) {
+        g.units.selected = u;
+        g.units.orderAt(near.cx, near.cz);
+      }
+    }
+    g.units.selected = null;
+    return {
+      fire: g.fire.activeFire.size,
+      ext: g.fire.totalExtinguished,
+      burned: g.fire.totalBurnedOut,
+      units: g.units.units.map((u) => `${u.state} w=${u.water.toFixed(0)}`),
+      tickMs: g.fire.lastTickMs.toFixed(2),
+      weather: g.weather.kind,
+      saved: g.economy.buildingsSaved,
+      lost: g.economy.buildingsLost,
+      integrity: g.economy.integrity,
+      cash: g.economy.cash,
+    };
+  });
+  console.log(
+    `t=${t}s fire=${s.fire} ext=${s.ext} burned=${s.burned} tick=${s.tickMs}ms wx=${s.weather} saved=${s.saved} lost=${s.lost} integ=${s.integrity} cash=${Math.round(s.cash)} units=[${s.units.join(' | ')}]`,
+  );
+  if (t === 30) await page.screenshot({ path: '/tmp/fv-3-fire.png' });
+  if (s.fire === 0 && t >= 30) contained = true;
 }
+console.log('player-managed session done; contained at least once:', contained);
 await page.screenshot({ path: '/tmp/fv-4-end.png' });
 
 const final = await page.evaluate(() => ({
@@ -63,7 +105,7 @@ const final = await page.evaluate(() => ({
 }));
 console.log('economy:', JSON.stringify(final));
 
-console.log('console errors:', errors.length ? errors : 'none');
+console.log('console errors:', errors.length ? errors.slice(0, 6) : 'none');
 await browser.close();
 await server.close();
 process.exit(errors.length > 0 ? 1 : 0);
